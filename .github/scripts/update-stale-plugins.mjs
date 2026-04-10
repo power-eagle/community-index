@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { indexPath, normalize, readConfig, writeIndex, writePromotedIndex } from './index-utils.mjs';
+import { indexPath, normalize, readConfig, readMetadata, writeIndex, writeMetadata, writePromotedIndex } from './index-utils.mjs';
 
 const githubOutput = process.env.GITHUB_OUTPUT;
 const githubToken = process.env.GITHUB_TOKEN;
@@ -55,7 +55,9 @@ async function githubRequest(apiPath) {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`GitHub API request failed (${response.status}): ${errorText}`);
+    const error = new Error(`GitHub API request failed (${response.status}): ${errorText}`);
+    error.status = response.status;
+    throw error;
   }
 
   return response.json();
@@ -91,7 +93,22 @@ async function processEntry(entry) {
   }
 
   const [owner, repo] = source.split('/');
-  const releases = await githubRequest(`/repos/${owner}/${repo}/releases?per_page=100`);
+  let releases;
+
+  try {
+    releases = await githubRequest(`/repos/${owner}/${repo}/releases?per_page=100`);
+  } catch (error) {
+    if (error?.status === 404) {
+      return {
+        status: 'missing-repo',
+        source,
+        reason: `Repository ${source} returned 404.`
+      };
+    }
+
+    throw error;
+  }
+
   const releaseContext = strategy.resolveReleaseContext(releases);
 
   if (!releaseContext) {
@@ -120,9 +137,26 @@ async function processEntry(entry) {
   };
 }
 
+function getSourceStatus(metadata, source) {
+  return metadata.source_status[source] ?? {
+    missing_repo_404_streak: 0,
+    issue_opened: false,
+    last_missing_repo_404_at: null
+  };
+}
+
+function setSourceStatus(metadata, source, nextStatus) {
+  metadata.source_status[source] = nextStatus;
+}
+
+function clearSourceStatus(metadata, source) {
+  delete metadata.source_status[source];
+}
+
 async function main() {
   const config = readConfig();
   const indexEntries = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+  const metadata = readMetadata();
   const candidates = selectCandidates(indexEntries, config.batchingCount, config.staleIntervalSeconds);
 
   if (candidates.length === 0) {
@@ -135,15 +169,45 @@ async function main() {
 
   let checkedCount = 0;
   let updatedCount = 0;
+  let metadataChanged = false;
   const failures = [];
   const updatedSources = [];
   const checkedSources = [];
+  const missingRepoIssues = [];
 
   for (const candidate of candidates) {
+    const source = String(candidate.entry.source ?? '').trim();
+
     try {
       const result = await processEntry(candidate.entry);
+      if (result.status === 'missing-repo') {
+        failures.push(`${result.source || '<unknown>'}: ${result.reason}`);
+        const currentStatus = getSourceStatus(metadata, source);
+        const nextStatus = {
+          missing_repo_404_streak: currentStatus.missing_repo_404_streak + 1,
+          issue_opened: currentStatus.issue_opened,
+          last_missing_repo_404_at: new Date().toISOString()
+        };
+
+        if (nextStatus.missing_repo_404_streak >= config.missingRepoConsecutiveThreshold && !nextStatus.issue_opened) {
+          nextStatus.issue_opened = true;
+          missingRepoIssues.push({
+            source,
+            streak: nextStatus.missing_repo_404_streak
+          });
+        }
+
+        setSourceStatus(metadata, source, nextStatus);
+        metadataChanged = true;
+        continue;
+      }
+
       if (result.status !== 'checked') {
         failures.push(`${result.source || '<unknown>'}: ${result.reason}`);
+        if (metadata.source_status[source]) {
+          clearSourceStatus(metadata, source);
+          metadataChanged = true;
+        }
         continue;
       }
 
@@ -151,31 +215,46 @@ async function main() {
       checkedCount += 1;
       checkedSources.push(result.source);
 
+      if (metadata.source_status[source]) {
+        clearSourceStatus(metadata, source);
+        metadataChanged = true;
+      }
+
       if (result.changed) {
         updatedCount += 1;
         updatedSources.push(`${result.source}@${result.version}`);
       }
     } catch (error) {
-      failures.push(`${candidate.entry.source || '<unknown>'}: ${error.message}`);
+      failures.push(`${source || '<unknown>'}: ${error.message}`);
+      if (metadata.source_status[source]) {
+        clearSourceStatus(metadata, source);
+        metadataChanged = true;
+      }
     }
   }
 
-  if (checkedCount === 0) {
+  if (checkedCount === 0 && !metadataChanged) {
     setOutput('result', 'no-op');
     setOutput('reason', failures.join('\n') || 'No stale entries could be processed successfully.');
     setOutput('processed_count', '0');
     setOutput('updated_count', '0');
+    setOutput('missing_repo_issues', '');
     return;
   }
 
   if (!dryRun) {
     writeIndex(indexEntries);
     writePromotedIndex(indexEntries, config.promotedMinUpvotes);
+    if (metadataChanged) {
+      writeMetadata(metadata);
+    }
   }
 
-  const commitMessage = updatedCount > 0
-    ? `Refresh ${checkedCount} plugin entries (${updatedCount} updated)`
-    : `Refresh ${checkedCount} plugin entries`;
+  const commitMessage = checkedCount > 0
+    ? updatedCount > 0
+      ? `Refresh ${checkedCount} plugin entries (${updatedCount} updated)`
+      : `Refresh ${checkedCount} plugin entries`
+    : 'Record scheduled plugin status changes';
 
   setOutput('result', 'ready');
   setOutput('reason', failures.length > 0 ? failures.join('\n') : 'Stale entries processed successfully.');
@@ -183,6 +262,7 @@ async function main() {
   setOutput('updated_count', String(updatedCount));
   setOutput('checked_sources', checkedSources.join('\n'));
   setOutput('updated_sources', updatedSources.join('\n'));
+  setOutput('missing_repo_issues', missingRepoIssues.map((entry) => `${entry.source}|${entry.streak}`).join('\n'));
   setOutput('commit_message', commitMessage);
 }
 

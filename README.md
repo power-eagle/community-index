@@ -19,6 +19,7 @@ Related files:
 - [index_trustedauthors.json](index_trustedauthors.json): users or organizations allowed to submit entries for repositories they do not directly own
 - [config.json](config.json): repository runtime settings such as scheduled batch size and stale interval
 - [index_promoted.json](index_promoted.json): promoted subset of the index filtered by minimum trusted upvotes
+- [metadata.json](metadata.json): repository automation state, including scheduled failure tracking
 - [LICENSE](LICENSE): repository license
 
 If you are not contributing changes, you do not need to understand the workflows under `.github/`.
@@ -68,6 +69,9 @@ Current behavior:
 - it loads the entry's `checkstrategy` script and checks the latest matching upstream release
 - it updates `lastchecked` for successfully checked entries
 - it updates `version` and `url` when upstream data changed
+- it tracks consecutive HTTP 404 failures for missing repositories in [metadata.json](metadata.json)
+- when a source reaches `missing_repo_consecutive_threshold`, it opens a `require-human-intervention` issue automatically
+- it opens that issue only once for the same still-missing source, until the source recovers and later starts failing again
 - after the batch, it rebuilds [index_promoted.json](index_promoted.json) using the configured promotion threshold
 - it commits the batch directly to `main`
 
@@ -122,6 +126,7 @@ Pattern summary:
 - [index.json](index.json) is the canonical machine-readable plugin index
 - [config.json](config.json) stores runtime batch settings for scheduled refresh behavior
 - [index_promoted.json](index_promoted.json) is a filtered, higher-trust subset based on upvote threshold
+- [metadata.json](metadata.json) stores automation state that should persist across scheduled runs, including repeated 404 tracking for missing repositories
 - issue forms under [.github/ISSUE_TEMPLATE](.github/ISSUE_TEMPLATE) collect structured requests from contributors
 - workflows under [.github/workflows](.github/workflows) translate issues into validated GitOps actions
 - strategy logic under [.github/scripts/check-strategies](.github/scripts/check-strategies) decides how to detect a valid upstream release for a given naming convention
@@ -145,6 +150,12 @@ To update automation behavior:
 
 Promotion behavior is controlled by [config.json](config.json):
 - `promoted_min_upvotes` decides when an entry is included in [index_promoted.json](index_promoted.json)
+- `missing_repo_consecutive_threshold` decides when repeated scheduled 404 failures open a human intervention issue
+
+Missing-repository behavior is controlled by [metadata.json](metadata.json):
+- each source can accumulate a consecutive 404 streak during scheduled refresh runs
+- once an issue has been opened for that source, automation does not keep opening duplicate issues on every batch
+- if the source later succeeds again, its stored failure state is cleared
 
 ### Agent Guidance
 
