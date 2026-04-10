@@ -1,0 +1,131 @@
+name: Process Add Entry
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - reopened
+      - labeled
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  process-add-entry:
+    if: contains(github.event.issue.labels.*.name, 'add-entry')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: process-add-entry-${{ github.event.issue.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Process add-entry issue
+        id: process
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: node .github/scripts/process-add-entry.mjs
+
+      - name: Label unauthorized or invalid requests
+        if: steps.process.outputs.result == 'needs-human'
+        uses: actions/github-script@v7
+        env:
+          REASON: ${{ steps.process.outputs.reason }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+            const label = 'require-human-intervention';
+            const reason = process.env.REASON;
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number,
+              labels: [label]
+            });
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: `Automation stopped and handed off for review.\n\nReason: ${reason}`
+            });
+
+      - name: Configure git identity
+        if: steps.process.outputs.result == 'ready'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit generated entry
+        if: steps.process.outputs.result == 'ready'
+        id: commit
+        env:
+          COMMIT_MESSAGE: ${{ steps.process.outputs.commit_message }}
+        run: |
+          git add index.json index_promoted.json
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD:main
+          echo "commit_hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Clear human intervention label after a valid retry
+        if: steps.process.outputs.result == 'ready'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number,
+                name: 'require-human-intervention'
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+
+      - name: Comment success and close issue
+        if: steps.process.outputs.result == 'ready'
+        uses: actions/github-script@v7
+        env:
+          COMMIT_HASH: ${{ steps.commit.outputs.commit_hash }}
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+            const commitHash = process.env.COMMIT_HASH;
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: `done ${commitHash}`
+            });
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number,
+              state: 'closed'
+            });

@@ -1,0 +1,72 @@
+name: Update Plugins
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-plugins:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: update-plugins
+      cancel-in-progress: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Process stale plugin batch
+        id: refresh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node .github/scripts/update-stale-plugins.mjs
+
+      - name: Configure git identity
+        if: steps.refresh.outputs.result == 'ready'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit refreshed index
+        if: steps.refresh.outputs.result == 'ready'
+        env:
+          COMMIT_MESSAGE: ${{ steps.refresh.outputs.commit_message }}
+        run: |
+          git add index.json index_promoted.json
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD:main
+
+      - name: Write workflow summary
+        env:
+          RESULT: ${{ steps.refresh.outputs.result }}
+          REASON: ${{ steps.refresh.outputs.reason }}
+          PROCESSED_COUNT: ${{ steps.refresh.outputs.processed_count }}
+          UPDATED_COUNT: ${{ steps.refresh.outputs.updated_count }}
+          UPDATED_SOURCES: ${{ steps.refresh.outputs.updated_sources }}
+        shell: pwsh
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "## Batch update summary"
+          Add-Content $env:GITHUB_STEP_SUMMARY ""
+          Add-Content $env:GITHUB_STEP_SUMMARY "- result: $env:RESULT"
+          Add-Content $env:GITHUB_STEP_SUMMARY "- processed: $env:PROCESSED_COUNT"
+          Add-Content $env:GITHUB_STEP_SUMMARY "- updated: $env:UPDATED_COUNT"
+          if ($env:UPDATED_SOURCES) {
+            Add-Content $env:GITHUB_STEP_SUMMARY "- updated sources:"
+            $env:UPDATED_SOURCES -split "`n" | Where-Object { $_ } | ForEach-Object {
+              Add-Content $env:GITHUB_STEP_SUMMARY "  - $_"
+            }
+          }
+          if ($env:REASON) {
+            Add-Content $env:GITHUB_STEP_SUMMARY ""
+            Add-Content $env:GITHUB_STEP_SUMMARY "### Notes"
+            Add-Content $env:GITHUB_STEP_SUMMARY $env:REASON
+          }

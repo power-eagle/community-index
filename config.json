@@ -1,0 +1,5 @@
+{
+    "batching_count": 20,
+    "stale_interval": 86400,
+    "promoted_min_upvotes": 3
+}

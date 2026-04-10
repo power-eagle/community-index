@@ -1,0 +1,166 @@
+name: Process Mismatched Version
+
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+      - edited
+      - labeled
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  process-mismatched-version:
+    if: contains(github.event.issue.labels.*.name, 'mismatched-version')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: process-mismatched-version-${{ github.event.issue.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Identify source from issue
+        id: identify
+        env:
+          MODE: identify
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: node .github/scripts/process-mismatched-version.mjs
+
+      - name: Reply when source is missing or invalid
+        if: steps.identify.outputs.result == 'source-missing' || steps.identify.outputs.result == 'invalid-source'
+        uses: actions/github-script@v7
+        env:
+          REASON: ${{ steps.identify.outputs.reason }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: process.env.REASON
+            });
+
+      - name: Reply when source is identified
+        if: steps.identify.outputs.result == 'identified'
+        uses: actions/github-script@v7
+        env:
+          SOURCE: ${{ steps.identify.outputs.source }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `source identified: ${process.env.SOURCE}, checking...`
+            });
+
+      - name: Check latest release against current entry
+        if: steps.identify.outputs.result == 'identified'
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: node .github/scripts/process-mismatched-version.mjs
+
+      - name: Label cases requiring human intervention
+        if: steps.check.outputs.result == 'needs-human'
+        uses: actions/github-script@v7
+        env:
+          REASON: ${{ steps.check.outputs.reason }}
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['require-human-intervention']
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Automation stopped and handed off for review.\n\nReason: ${process.env.REASON}`
+            });
+
+      - name: Configure git identity
+        if: steps.check.outputs.result == 'updated'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit updated entry
+        if: steps.check.outputs.result == 'updated'
+        id: commit
+        env:
+          COMMIT_MESSAGE: ${{ steps.check.outputs.commit_message }}
+        run: |
+          git add index.json index_promoted.json
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD:main
+          echo "commit_hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Clear human intervention label after successful update
+        if: steps.check.outputs.result == 'updated'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'require-human-intervention'
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+
+      - name: Reply when entry was updated
+        if: steps.check.outputs.result == 'updated'
+        uses: actions/github-script@v7
+        env:
+          COMMIT_HASH: ${{ steps.commit.outputs.commit_hash }}
+          SOURCE: ${{ steps.check.outputs.source }}
+          VERSION: ${{ steps.check.outputs.version }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `thank you, updated ${process.env.SOURCE} to v${process.env.VERSION} in ${process.env.COMMIT_HASH}`
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
+
+      - name: Reply when no change was found
+        if: steps.check.outputs.result == 'no-change'
+        uses: actions/github-script@v7
+        env:
+          SOURCE: ${{ steps.check.outputs.source }}
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `no changes found for ${process.env.SOURCE}`
+            });

@@ -1,0 +1,20 @@
+name: Upvote
+description: Increase trust for an indexed plugin source.
+title: "Upvote: "
+labels:
+  - upvote
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to upvote an existing entry in [index.json](../blob/main/index.json).
+
+        Only authors listed in [index_trustedauthors.json](../blob/main/index_trustedauthors.json) may use this workflow.
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Repository identifier in `owner/repository` format.
+      placeholder: ZackaryW/eagle-zipper
+    validations:
+      required: true

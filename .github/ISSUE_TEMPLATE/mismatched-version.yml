@@ -1,0 +1,18 @@
+name: Mismatched Version
+description: Report that an indexed source may be out of sync with its latest release.
+title: "Mismatched version: "
+labels:
+  - mismatched-version
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when an existing entry in [index.json](../blob/main/index.json) appears out of date.
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Repository identifier in `owner/repository` format.
+      placeholder: ZackaryW/eagle-zipper
+    validations:
+      required: true

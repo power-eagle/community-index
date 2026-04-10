@@ -1,0 +1,121 @@
+name: Process Upvote
+
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+      - edited
+      - labeled
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  process-upvote:
+    if: contains(github.event.issue.labels.*.name, 'upvote')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: process-upvote-${{ github.event.issue.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Process upvote issue
+        id: process
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        run: node .github/scripts/process-upvote.mjs
+
+      - name: Label unauthorized or invalid requests
+        if: steps.process.outputs.result == 'needs-human'
+        uses: actions/github-script@v7
+        env:
+          REASON: ${{ steps.process.outputs.reason }}
+        with:
+          script: |
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['require-human-intervention']
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `Automation stopped and handed off for review.\n\nReason: ${process.env.REASON}`
+            });
+
+      - name: Configure git identity
+        if: steps.process.outputs.result == 'ready'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit upvote change
+        if: steps.process.outputs.result == 'ready'
+        id: commit
+        env:
+          COMMIT_MESSAGE: ${{ steps.process.outputs.commit_message }}
+        run: |
+          git add index.json index_promoted.json
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD:main
+          echo "commit_hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Clear human intervention label after success
+        if: steps.process.outputs.result == 'ready'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'require-human-intervention'
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+
+      - name: Comment success and close issue
+        if: steps.process.outputs.result == 'ready'
+        uses: actions/github-script@v7
+        env:
+          COMMIT_HASH: ${{ steps.commit.outputs.commit_hash }}
+          SOURCE: ${{ steps.process.outputs.source }}
+          UPVOTES: ${{ steps.process.outputs.upvotes }}
+          PROMOTED: ${{ steps.process.outputs.promoted }}
+        with:
+          script: |
+            const promotedSuffix = process.env.PROMOTED === 'true'
+              ? ' It now qualifies for index_promoted.json.'
+              : '';
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `done ${process.env.COMMIT_HASH}\n\n${process.env.SOURCE} now has ${process.env.UPVOTES} upvotes.${promotedSuffix}`
+            });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });

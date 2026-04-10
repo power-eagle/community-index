@@ -1,0 +1,32 @@
+name: Add Entry
+description: Request a new plugin index entry.
+title: "Add entry: "
+labels:
+  - add-entry
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to request a new entry in [index.json](../blob/main/index.json).
+        Supported naming rules live under [.github/scripts/check-strategies/](../tree/main/.github/scripts/check-strategies).
+
+        Provide the minimum data needed for the GitOps workflow:
+        - `source`
+        - `checkstrategy`
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Repository identifier in `owner/repository` format.
+      placeholder: ZackaryW/eagle-zipper
+    validations:
+      required: true
+  - type: dropdown
+    id: checkstrategy
+    attributes:
+      label: Check strategy
+      description: Select the validation strategy for this entry.
+      options:
+        - power-eagle-v1
+    validations:
+      required: true
