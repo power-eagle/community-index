@@ -7,5 +7,14 @@
         "version": "2.1.0",
         "checkstrategy": "power-eagle-v1",
         "upvotes": 0
+    },
+    {
+        "source": "ZackaryW/eagle-markdown",
+        "description": "markdown support for eagle file explorer",
+        "lastchecked": "2026-04-10T20:33:46.244Z",
+        "url": "https://github.com/ZackaryW/eagle-markdown/releases/download/v1.0.0/Markdown.Support-v1.0.0-release.eagleplugin",
+        "version": "1.0.0",
+        "checkstrategy": "power-eagle-v1",
+        "upvotes": 0
     }
 ]
