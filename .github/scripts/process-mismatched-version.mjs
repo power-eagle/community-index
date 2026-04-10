@@ -146,16 +146,6 @@ async function check() {
   }
 
   const currentEntry = found.entry;
-  const hasChanges = currentEntry.version !== releaseContext.version || currentEntry.url !== releaseContext.assetUrl;
-
-  if (!hasChanges) {
-    setOutput('result', 'no-change');
-    setOutput('source', source);
-    setOutput('version', currentEntry.version ?? '');
-    setOutput('reason', `No changes found for ${source}.`);
-    return;
-  }
-
   indexEntries[found.entryIndex] = {
     ...currentEntry,
     lastchecked: new Date().toISOString(),
@@ -163,9 +153,20 @@ async function check() {
     version: releaseContext.version
   };
 
+  const hasChanges = currentEntry.version !== releaseContext.version || currentEntry.url !== releaseContext.assetUrl;
+
   const config = readConfig();
   writeIndex(indexEntries);
   writePromotedIndex(indexEntries, config.promotedMinUpvotes);
+
+  if (!hasChanges) {
+    setOutput('result', 'no-change');
+    setOutput('source', source);
+    setOutput('version', currentEntry.version ?? '');
+    setOutput('commit_message', `Refresh lastchecked for ${source.replace(/[^a-zA-Z0-9._-]+/g, '-')}`);
+    setOutput('reason', `No changes found for ${source}.`);
+    return;
+  }
 
   const sanitizedSource = source.replace(/[^a-zA-Z0-9._-]+/g, '-');
   setOutput('result', 'updated');

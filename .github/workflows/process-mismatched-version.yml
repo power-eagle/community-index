@@ -94,13 +94,13 @@ jobs:
             });
 
       - name: Configure git identity
-        if: steps.check.outputs.result == 'updated'
+        if: steps.check.outputs.result == 'updated' || steps.check.outputs.result == 'no-change'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit updated entry
-        if: steps.check.outputs.result == 'updated'
+      - name: Commit checked entry
+        if: steps.check.outputs.result == 'updated' || steps.check.outputs.result == 'no-change'
         id: commit
         env:
           COMMIT_MESSAGE: ${{ steps.check.outputs.commit_message }}
@@ -110,8 +110,8 @@ jobs:
           git push origin HEAD:main
           echo "commit_hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Clear human intervention label after successful update
-        if: steps.check.outputs.result == 'updated'
+      - name: Clear human intervention label after successful check
+        if: steps.check.outputs.result == 'updated' || steps.check.outputs.result == 'no-change'
         uses: actions/github-script@v7
         with:
           script: |
@@ -156,11 +156,12 @@ jobs:
         uses: actions/github-script@v7
         env:
           SOURCE: ${{ steps.check.outputs.source }}
+          COMMIT_HASH: ${{ steps.commit.outputs.commit_hash }}
         with:
           script: |
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `no changes found for ${process.env.SOURCE}`
+              body: `no changes found for ${process.env.SOURCE}\n\nlastchecked refreshed in ${process.env.COMMIT_HASH}`
             });

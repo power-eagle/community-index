@@ -54,7 +54,7 @@ Current behavior:
 - it replies `source identified: <source>, checking...`
 - it loads the entry's `checkstrategy` script and checks the latest matching upstream release
 - if the upstream version or URL changed, it updates [index.json](index.json), commits directly to `main`, replies with a thank-you message including the commit hash, and closes the issue
-- if there is no difference, it replies `no changes found for <source>`
+- if there is no difference, it still refreshes `lastchecked`, commits that change, and replies `no changes found for <source>`
 
 ### Scheduled Refresh
 
