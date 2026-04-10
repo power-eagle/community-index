@@ -2,7 +2,7 @@
     {
         "source": "ZackaryW/eagle-zipper",
         "description": "zip management for eagle",
-        "lastchecked": "2024-01-01T12:00:00Z",
+        "lastchecked": "2026-04-10T20:33:46.244Z",
         "url": "https://github.com/ZackaryW/eagle-zipper/releases/download/v2.1.0/zipper-v2.1.0-release.eagleplugin",
         "version": "2.1.0",
         "checkstrategy": "power-eagle-v1",
