@@ -7,6 +7,9 @@ const issueNumber = process.env.ISSUE_NUMBER ?? '';
 const githubOutput = process.env.GITHUB_OUTPUT;
 const githubToken = process.env.GITHUB_TOKEN;
 
+/**
+ * Write a named value to the GitHub Actions output file.
+ */
 function setOutput(name, value) {
   if (!githubOutput) {
     return;
@@ -15,6 +18,9 @@ function setOutput(name, value) {
   fs.appendFileSync(githubOutput, `${name}<<__OUTPUT__\n${value}\n__OUTPUT__\n`);
 }
 
+/**
+ * Load a strategy implementation by checkstrategy name.
+ */
 async function loadCheckStrategy(name) {
   if (!/^[a-z0-9-]+$/i.test(name)) {
     return null;
@@ -36,6 +42,9 @@ async function loadCheckStrategy(name) {
   }
 }
 
+/**
+ * Extract a field from an issue-form markdown body.
+ */
 function extractField(body, heading) {
   const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`###\\s+${escapedHeading}\\s*\\r?\\n\\r?\\n([\\s\\S]*?)(?=\\r?\\n###\\s+|$)`, 'i');
@@ -43,6 +52,9 @@ function extractField(body, heading) {
   return match?.[1]?.trim() ?? '';
 }
 
+/**
+ * Query the GitHub API with the workflow token when available.
+ */
 async function githubRequest(apiPath) {
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -65,11 +77,17 @@ async function githubRequest(apiPath) {
   return response.json();
 }
 
+/**
+ * Emit a manual-review outcome for invalid or suspicious requests.
+ */
 function markNeedsHuman(reason) {
   setOutput('result', 'needs-human');
   setOutput('reason', reason);
 }
 
+/**
+ * Validate an add-entry issue and append a UUID-backed index entry.
+ */
 async function main() {
   const source = extractField(issueBody, 'Source');
   const checkStrategy = extractField(issueBody, 'Check strategy');
@@ -100,7 +118,12 @@ async function main() {
   const repoMetadata = await githubRequest(`/repos/${owner}/${repo}`);
   const releases = await githubRequest(`/repos/${owner}/${repo}/releases?per_page=100`);
 
-  const releaseContext = strategy.resolveReleaseContext(releases);
+  const releaseContext = await strategy.resolveReleaseContext(releases, {
+    owner,
+    repo,
+    defaultBranch: repoMetadata.default_branch,
+    githubToken
+  });
 
   if (!releaseContext) {
     markNeedsHuman(`No release in ${source} matched the ${checkStrategy} rules.`);
@@ -121,6 +144,7 @@ async function main() {
     lastchecked: new Date().toISOString(),
     url: releaseContext.assetUrl,
     version: releaseContext.version,
+    uuid: releaseContext.uuid,
     checkstrategy: checkStrategy,
     upvotes: 0
   };

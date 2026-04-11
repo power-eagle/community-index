@@ -2,9 +2,10 @@
     {
         "source": "ZackaryW/eagle-zipper",
         "description": "zip management for eagle",
-        "lastchecked": "2026-04-10T20:33:46.244Z",
+        "lastchecked": "2026-04-11T18:01:16.052Z",
         "url": "https://github.com/ZackaryW/eagle-zipper/releases/download/v2.1.0/zipper-v2.1.0-release.eagleplugin",
         "version": "2.1.0",
+        "uuid": "8f788ab3-52e9-4190-a8c5-5ee1973ca968",
         "checkstrategy": "power-eagle-v1",
         "upvotes": 0
     },
@@ -14,6 +15,7 @@
         "lastchecked": "2026-04-10T20:33:46.244Z",
         "url": "https://github.com/ZackaryW/eagle-markdown/releases/download/v1.0.0/Markdown.Support-v1.0.0-release.eagleplugin",
         "version": "1.0.0",
+        "uuid": "60ee0b0e-cd56-11ef-9cd2-0242ac120002",
         "checkstrategy": "power-eagle-v1",
         "upvotes": 0
     }

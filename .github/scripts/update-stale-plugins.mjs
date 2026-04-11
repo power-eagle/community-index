@@ -5,6 +5,9 @@ const githubOutput = process.env.GITHUB_OUTPUT;
 const githubToken = process.env.GITHUB_TOKEN;
 const dryRun = String(process.env.DRY_RUN ?? '').toLowerCase() === 'true';
 
+/**
+ * Write a named value to the GitHub Actions output file.
+ */
 function setOutput(name, value) {
   if (!githubOutput) {
     return;
@@ -13,11 +16,17 @@ function setOutput(name, value) {
   fs.appendFileSync(githubOutput, `${name}<<__OUTPUT__\n${value}\n__OUTPUT__\n`);
 }
 
+/**
+ * Parse a timestamp string into milliseconds for stale-entry sorting.
+ */
 function parseTimestamp(value) {
   const parsed = Date.parse(String(value ?? ''));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+/**
+ * Load a strategy implementation by checkstrategy name.
+ */
 async function loadCheckStrategy(name) {
   if (!/^[a-z0-9-]+$/i.test(name)) {
     return null;
@@ -39,6 +48,9 @@ async function loadCheckStrategy(name) {
   }
 }
 
+/**
+ * Query the GitHub API with the workflow token when available.
+ */
 async function githubRequest(apiPath) {
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -63,6 +75,9 @@ async function githubRequest(apiPath) {
   return response.json();
 }
 
+/**
+ * Select the oldest eligible entries outside the stale interval.
+ */
 function selectCandidates(indexEntries, maxBatchSize, staleIntervalSeconds) {
   const cutoff = Date.now() - staleIntervalSeconds * 1000;
 
@@ -73,6 +88,9 @@ function selectCandidates(indexEntries, maxBatchSize, staleIntervalSeconds) {
     .slice(0, maxBatchSize);
 }
 
+  /**
+   * Check one scheduled entry and return its refreshed release state.
+   */
 async function processEntry(entry) {
   const source = String(entry.source ?? '').trim();
   if (!source.includes('/')) {
@@ -93,9 +111,11 @@ async function processEntry(entry) {
   }
 
   const [owner, repo] = source.split('/');
+  let repoMetadata;
   let releases;
 
   try {
+    repoMetadata = await githubRequest(`/repos/${owner}/${repo}`);
     releases = await githubRequest(`/repos/${owner}/${repo}/releases?per_page=100`);
   } catch (error) {
     if (error?.status === 404) {
@@ -109,7 +129,12 @@ async function processEntry(entry) {
     throw error;
   }
 
-  const releaseContext = strategy.resolveReleaseContext(releases);
+  const releaseContext = await strategy.resolveReleaseContext(releases, {
+    owner,
+    repo,
+    defaultBranch: repoMetadata.default_branch,
+    githubToken
+  });
 
   if (!releaseContext) {
     return {
@@ -119,12 +144,21 @@ async function processEntry(entry) {
     };
   }
 
+  if (entry.uuid && normalize(entry.uuid) !== normalize(releaseContext.uuid)) {
+    return {
+      status: 'failed',
+      source,
+      reason: `UUID mismatch detected for ${source}. Stored UUID ${entry.uuid} does not match repository manifest UUID ${releaseContext.uuid}.`
+    };
+  }
+
   const checkedAt = new Date().toISOString();
   const updatedEntry = {
     ...entry,
     lastchecked: checkedAt,
     url: releaseContext.assetUrl,
-    version: releaseContext.version
+    version: releaseContext.version,
+    uuid: releaseContext.uuid
   };
   const changed = normalize(entry.version) !== normalize(releaseContext.version) || normalize(entry.url) !== normalize(releaseContext.assetUrl);
 
@@ -137,6 +171,9 @@ async function processEntry(entry) {
   };
 }
 
+/**
+ * Read per-source scheduled status from metadata with defaults.
+ */
 function getSourceStatus(metadata, source) {
   return metadata.source_status[source] ?? {
     missing_repo_404_streak: 0,
@@ -145,14 +182,23 @@ function getSourceStatus(metadata, source) {
   };
 }
 
+/**
+ * Store per-source scheduled status in metadata.
+ */
 function setSourceStatus(metadata, source, nextStatus) {
   metadata.source_status[source] = nextStatus;
 }
 
+/**
+ * Remove per-source scheduled status after recovery.
+ */
 function clearSourceStatus(metadata, source) {
   delete metadata.source_status[source];
 }
 
+/**
+ * Process one scheduled refresh batch and emit workflow outputs.
+ */
 async function main() {
   const config = readConfig();
   const indexEntries = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
