@@ -28,5 +28,15 @@
         "uuid": "5cef2ac5-9d8f-46cb-b0ad-0000dd99d328",
         "checkstrategy": "power-eagle-v1",
         "upvotes": 0
+    },
+    {
+        "source": "power-eagle/eagle-brat",
+        "description": "brat support for eagle.cool",
+        "lastchecked": "2026-04-11T20:15:35.633Z",
+        "url": "https://github.com/power-eagle/eagle-brat/releases/download/v1.0.0/Eagle-BRAT-v1.0.0-release.eagleplugin",
+        "version": "1.0.0",
+        "uuid": "ee7593f0-d7ee-4945-99fb-7f4605c64df8",
+        "checkstrategy": "power-eagle-v1",
+        "upvotes": 0
     }
 ]
