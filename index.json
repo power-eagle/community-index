@@ -38,5 +38,15 @@
         "uuid": "ee7593f0-d7ee-4945-99fb-7f4605c64df8",
         "checkstrategy": "power-eagle-v1",
         "upvotes": 0
+    },
+    {
+        "source": "power-eagle/eagle-connect",
+        "description": "eagle plugin for smb, ftp and webdav servers",
+        "lastchecked": "2026-04-12T19:08:40.321Z",
+        "url": "https://github.com/power-eagle/eagle-connect/releases/download/v1.0.0/Eagle-Connect-v1.0.0-release.eagleplugin",
+        "version": "1.0.0",
+        "uuid": "92edab36-6ba7-429d-bd40-f25d0985afd7",
+        "checkstrategy": "power-eagle-v1",
+        "upvotes": 0
     }
 ]
