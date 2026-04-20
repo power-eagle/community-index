@@ -2,7 +2,7 @@
     {
         "source": "ZackaryW/eagle-zipper",
         "description": "zip management for eagle",
-        "lastchecked": "2026-04-19T07:23:17.134Z",
+        "lastchecked": "2026-04-20T08:12:08.155Z",
         "url": "https://github.com/ZackaryW/eagle-zipper/releases/download/v2.1.0/zipper-v2.1.0-release.eagleplugin",
         "version": "2.1.0",
         "uuid": "8f788ab3-52e9-4190-a8c5-5ee1973ca968",
@@ -42,7 +42,7 @@
     {
         "source": "power-eagle/eagle-connect",
         "description": "eagle plugin for smb, ftp and webdav servers",
-        "lastchecked": "2026-04-19T07:23:17.866Z",
+        "lastchecked": "2026-04-20T08:12:09.105Z",
         "url": "https://github.com/power-eagle/eagle-connect/releases/download/v1.0.0/Eagle-Connect-v1.0.0-release.eagleplugin",
         "version": "1.0.0",
         "uuid": "92edab36-6ba7-429d-bd40-f25d0985afd7",
