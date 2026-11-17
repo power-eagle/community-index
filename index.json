@@ -2,7 +2,7 @@
     {
         "source": "ZackaryW/eagle-zipper",
         "description": "zip management for eagle",
-        "lastchecked": "2026-11-16T15:07:04.421Z",
+        "lastchecked": "2026-11-17T15:38:41.240Z",
         "url": "https://github.com/power-eagle/eagle-zipper/releases/download/v2.1.0/zipper-v2.1.0-release.eagleplugin",
         "version": "2.1.0",
         "uuid": "8f788ab3-52e9-4190-a8c5-5ee1973ca968",
@@ -12,7 +12,7 @@
     {
         "source": "ZackaryW/eagle-markdown",
         "description": "markdown support for eagle file explorer",
-        "lastchecked": "2026-11-16T15:07:09.004Z",
+        "lastchecked": "2026-11-17T15:38:45.763Z",
         "url": "https://github.com/power-eagle/eagle-markdown/releases/download/v1.0.0/Markdown.Support-v1.0.0-release.eagleplugin",
         "version": "1.0.0",
         "uuid": "60ee0b0e-cd56-11ef-9cd2-0242ac120002",
@@ -22,7 +22,7 @@
     {
         "source": "power-eagle/power-eagle",
         "description": "powertoys for eagle.cool",
-        "lastchecked": "2026-11-16T15:07:06.706Z",
+        "lastchecked": "2026-11-17T15:38:43.186Z",
         "url": "https://github.com/power-eagle/power-eagle/releases/download/v6.0.2/Power.Eagle-v6.0.2-release.eagleplugin",
         "version": "6.0.2",
         "uuid": "5cef2ac5-9d8f-46cb-b0ad-0000dd99d328",
@@ -32,7 +32,7 @@
     {
         "source": "power-eagle/eagle-brat",
         "description": "brat support for eagle.cool",
-        "lastchecked": "2026-11-16T15:07:07.680Z",
+        "lastchecked": "2026-11-17T15:38:44.219Z",
         "url": "https://github.com/power-eagle/eagle-brat/releases/download/v1.0.0/Eagle-BRAT-v1.0.0-release.eagleplugin",
         "version": "1.0.0",
         "uuid": "ee7593f0-d7ee-4945-99fb-7f4605c64df8",
@@ -42,7 +42,7 @@
     {
         "source": "power-eagle/eagle-connect",
         "description": "eagle plugin for smb, ftp and webdav servers",
-        "lastchecked": "2026-11-16T15:07:05.405Z",
+        "lastchecked": "2026-11-17T15:38:42.217Z",
         "url": "https://github.com/power-eagle/eagle-connect/releases/download/v1.0.0/Eagle-Connect-v1.0.0-release.eagleplugin",
         "version": "1.0.0",
         "uuid": "92edab36-6ba7-429d-bd40-f25d0985afd7",
